@@ -331,9 +331,21 @@ The skill will automatically use the local `mailclaw` CLI to fetch and display r
 
 The skill definition is located at `skills/mailclaw/SKILL.md`. You can copy or adapt it for any AI agent framework that supports markdown-based skill definitions, or invoke the `mailclaw` CLI directly.
 
-## Limitations
+## Sending Email
 
-MailClaw currently supports **receiving and reading** emails only. Replying to and sending emails are not yet supported because [Cloudflare Email Sending](https://developers.cloudflare.com/email-routing/email-workers/send-emails/) is still in beta with a waitlist. We will add send/reply support once the feature becomes generally available.
+MailClaw supports two send providers, selectable via the `EMAIL_PROVIDER` env var (defaults to `resend`):
+
+- **`resend`** — Uses the [Resend API](https://resend.com). Requires `RESEND_API_KEY` secret. Can send to any address.
+- **`cloudflare`** — Uses the native [Cloudflare `send_email` binding](https://developers.cloudflare.com/email-routing/email-workers/send-email-workers/). No external service required, but recipients must be **verified destination addresses** in your Cloudflare Email Routing settings.
+
+The `SEND_EMAIL` binding is configured in `wrangler.jsonc` and ready to use after deploy. To switch to the Cloudflare provider:
+
+```bash
+bunx wrangler secret put EMAIL_PROVIDER
+# enter: cloudflare
+```
+
+Outgoing sender addresses must use a domain that you own and have configured in Cloudflare Email Routing.
 
 ## Local Development
 
