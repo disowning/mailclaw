@@ -10,13 +10,14 @@
 		{
 			"binding": "D1",
 			"database_name": "mailclaw-d1",
-			"database_id": "199c8d08-98a1-46af-a9e1-2c55f3582b87",
+			"database_id": "REPLACE_WITH_YOUR_DATABASE_ID",
 			"remote": true
 		}
 	],
 	"send_email": [
 		{
-			"name": "SEND_EMAIL"
+			"name": "SEND_EMAIL",
+			"remote": true
 		}
 	],
 	"workers_dev": true,
