@@ -20,6 +20,13 @@
 			"remote": true
 		}
 	],
+	"r2_buckets": [
+		{
+			"binding": "ATTACHMENTS",
+			"bucket_name": "mailclaw-attachments",
+			"remote": true
+		}
+	],
 	"workers_dev": true,
 	"preview_urls": false,
 	"placement": {
