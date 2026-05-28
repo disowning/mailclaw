@@ -4,6 +4,9 @@ node_modules/
 # Build
 dist/
 target/
+*.tsbuildinfo
+dashboard/vite.config.js
+dashboard/vite.config.d.ts
 
 # Cloudflare
 .wrangler/
