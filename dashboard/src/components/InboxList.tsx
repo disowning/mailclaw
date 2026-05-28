@@ -51,24 +51,24 @@ export function InboxList({ data, loading, error, selectedId, onSelect, onPage }
 									</div>
 									<div className="min-w-0 flex-1">
 										<div className="flex items-baseline justify-between gap-2">
-											<div className="truncate text-sm font-semibold text-black/90">
-												{senderLabel(email.from_address)}
+											<div className="flex min-w-0 items-center gap-1.5">
+												{email.has_attachments ? (
+													<PaperclipIcon
+														width={13}
+														height={13}
+														className="flex-none text-black/40"
+													/>
+												) : null}
+												<div className="truncate text-sm font-semibold text-black/90">
+													{email.subject?.trim() || "(no subject)"}
+												</div>
 											</div>
 											<div className="flex-none text-xs text-black/50">
 												{formatDate(email.received_at)}
 											</div>
 										</div>
-										<div className="flex items-center gap-1.5 truncate text-sm text-black/80">
-											{email.has_attachments ? (
-												<PaperclipIcon
-													width={13}
-													height={13}
-													className="flex-none text-black/40"
-												/>
-											) : null}
-											<span className="truncate">
-												{email.subject?.trim() || "(no subject)"}
-											</span>
+										<div className="truncate text-sm text-black/65">
+											{senderLabel(email.from_address)}
 										</div>
 										<div className="truncate text-xs text-black/45">
 											to {email.to_address}

@@ -2,7 +2,6 @@ import { Button, Description, Input, Label, TextField } from "@heroui/react";
 import { type FormEvent, useState } from "react";
 import { ApiError, api } from "@/api/client";
 import type { DashboardConfig } from "@/lib/config";
-import { MailIcon } from "@/components/Icons";
 
 interface Props {
 	initial: DashboardConfig;
@@ -42,9 +41,7 @@ export function SetupScreen({ initial, onSave }: Props) {
 				className="w-full max-w-md rounded-2xl border border-black/10 bg-white p-8 shadow-sm"
 			>
 				<div className="mb-6 flex items-center gap-3">
-					<div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 text-white">
-						<MailIcon width={22} height={22} />
-					</div>
+					<img src="/logo.svg" alt="MailClaw" className="h-10 w-10" />
 					<div>
 						<div className="text-xl font-semibold">MailClaw</div>
 						<div className="text-sm text-black/60">Connect your inbox</div>

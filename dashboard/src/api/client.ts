@@ -1,11 +1,34 @@
 import type {
 	ApiResponse,
+	AttachmentSummary,
 	Email,
 	EmailFilters,
+	EmailSummary,
 	PaginatedEmails,
 	SendEmailRequest,
 	SendEmailResponse,
 } from "@/types";
+
+// Server stores timestamps in Unix seconds; rest of the dashboard uses ms.
+function secondsToMs<T extends { received_at?: number; created_at?: number }>(o: T): T {
+	if (typeof o.received_at === "number") o.received_at *= 1000;
+	if (typeof o.created_at === "number") o.created_at *= 1000;
+	return o;
+}
+
+function normalizeSummary(e: EmailSummary): EmailSummary {
+	return secondsToMs({ ...e });
+}
+
+function normalizeAttachment(a: AttachmentSummary): AttachmentSummary {
+	return secondsToMs({ ...a });
+}
+
+function normalizeEmail(e: Email): Email {
+	const out = secondsToMs({ ...e });
+	if (out.attachments) out.attachments = out.attachments.map(normalizeAttachment);
+	return out;
+}
 
 export class ApiError extends Error {
 	code: string;
@@ -62,13 +85,22 @@ export interface ClientCtx {
 }
 
 export const api = {
-	list: (ctx: ClientCtx, filters: EmailFilters = {}) =>
-		call<PaginatedEmails>(ctx.host, ctx.token, "/api/emails", {
+	async list(ctx: ClientCtx, filters: EmailFilters = {}) {
+		const res = await call<PaginatedEmails>(ctx.host, ctx.token, "/api/emails", {
 			params: filters as Record<string, unknown>,
-		}),
+		});
+		res.emails = res.emails.map(normalizeSummary);
+		return res;
+	},
 
-	get: (ctx: ClientCtx, id: string) =>
-		call<Email>(ctx.host, ctx.token, `/api/emails/${encodeURIComponent(id)}`),
+	async get(ctx: ClientCtx, id: string) {
+		const email = await call<Email>(
+			ctx.host,
+			ctx.token,
+			`/api/emails/${encodeURIComponent(id)}`,
+		);
+		return normalizeEmail(email);
+	},
 
 	delete: (ctx: ClientCtx, id: string) =>
 		call<{ message: string }>(ctx.host, ctx.token, `/api/emails/${encodeURIComponent(id)}`, {

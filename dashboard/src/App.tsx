@@ -82,9 +82,7 @@ export default function App() {
 		<div className="flex h-screen flex-col bg-[#f6f8fa]">
 			<header className="flex items-center gap-3 border-b border-black/5 bg-white px-4 py-2.5">
 				<div className="flex items-center gap-2">
-					<div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600 text-white">
-						<MailIcon width={20} height={20} />
-					</div>
+					<img src="/logo.svg" alt="MailClaw" className="h-8 w-8" />
 					<div className="text-lg font-semibold tracking-tight text-black/85">
 						MailClaw
 					</div>

@@ -141,34 +141,56 @@ export function EmailDetail({ ctx, emailId, onBack, onDeleted, onReply }: Props)
 
 function EmailBody({ html, text }: { html: string | null; text: string | null }) {
 	const iframeRef = useRef<HTMLIFrameElement | null>(null);
-	const [height, setHeight] = useState(400);
+	const [height, setHeight] = useState(0);
 
 	useEffect(() => {
 		if (!html || !iframeRef.current) return;
 		const iframe = iframeRef.current;
 		const doc = `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>
-			html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111;background:#fff;font-size:14px;line-height:1.55}
-			body{padding:20px 24px}
-			img{max-width:100%;height:auto}
+			html,body{margin:0;padding:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:#111;background:#fff;font-size:14px;line-height:1.55;overflow-x:hidden;width:100%;max-width:100%}
+			body{padding:16px 24px;word-wrap:break-word;overflow-wrap:anywhere}
+			body *{max-width:100%!important;box-sizing:border-box}
+			img,video{height:auto!important;object-fit:contain}
+			table{table-layout:auto!important;width:auto!important;max-width:100%!important;border-collapse:collapse}
 			a{color:#1a73e8}
 			blockquote{margin:8px 0;padding:4px 0 4px 12px;border-left:3px solid #dadce0;color:#5f6368}
-			table{max-width:100%}
 			pre,code{white-space:pre-wrap;word-break:break-word}
 		</style></head><body>${html}</body></html>`;
 		iframe.srcdoc = doc;
+
+		let observer: ResizeObserver | null = null;
+		const measure = () => {
+			const doc = iframe.contentDocument;
+			const body = doc?.body;
+			const root = doc?.documentElement;
+			if (!body || !root) return;
+			// Use the larger of body / documentElement scroll/offset height to handle
+			// quirks across email HTML; trim a couple px to avoid a spurious scrollbar.
+			const h = Math.max(body.scrollHeight, body.offsetHeight, root.scrollHeight);
+			if (h > 0) setHeight(h);
+		};
+
 		const onLoad = () => {
-			try {
-				const body = iframe.contentDocument?.body;
-				if (body) {
-					const h = Math.max(body.scrollHeight + 32, 200);
-					setHeight(h);
+			measure();
+			const body = iframe.contentDocument?.body;
+			if (body && "ResizeObserver" in window) {
+				observer = new ResizeObserver(measure);
+				observer.observe(body);
+			}
+			// Late-loading images / fonts can change layout.
+			const imgs = iframe.contentDocument?.images;
+			if (imgs) {
+				for (const img of Array.from(imgs)) {
+					if (!img.complete) img.addEventListener("load", measure, { once: true });
 				}
-			} catch {
-				// cross-origin failure should not happen with srcdoc, but guard anyway.
 			}
 		};
+
 		iframe.addEventListener("load", onLoad);
-		return () => iframe.removeEventListener("load", onLoad);
+		return () => {
+			iframe.removeEventListener("load", onLoad);
+			observer?.disconnect();
+		};
 	}, [html]);
 
 	if (html) {
@@ -176,9 +198,9 @@ function EmailBody({ html, text }: { html: string | null; text: string | null })
 			<iframe
 				ref={iframeRef}
 				title="Email content"
-				className="email-html-frame"
+				className="email-html-frame block"
 				sandbox="allow-popups allow-popups-to-escape-sandbox"
-				style={{ height }}
+				style={{ height: height || 200, width: "100%" }}
 			/>
 		);
 	}
