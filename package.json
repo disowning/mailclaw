@@ -6,7 +6,7 @@
     "dev:dashboard": "cd dashboard && bun run dev",
     "dashboard:install": "cd dashboard && bun install",
     "build:dashboard": "cd dashboard && bun install && bun run build",
-    "deploy": "bun run build:dashboard && wrangler deploy --minify",
+    "deploy": "bun run build:dashboard && wrangler deploy -c $(test -f wrangler.local.jsonc && echo wrangler.local.jsonc || echo wrangler.jsonc) --minify",
     "tail": "wrangler tail",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "r2:create": "wrangler r2 bucket create mailclaw-attachments",
