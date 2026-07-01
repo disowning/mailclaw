@@ -1,32 +1,29 @@
 import type { Context, Next } from "hono";
+
 import { ERR } from "@/utils/http";
 
-const encoder = new TextEncoder();
+export async function authMiddleware(
+  c: Context<{ Bindings: CloudflareBindings }>,
+  next: Next,
+) {
+  const authHeader = c.req.header("Authorization");
 
-function timingSafeEqual(a: string, b: string): boolean {
-	const aBytes = encoder.encode(a);
-	const bBytes = encoder.encode(b);
-	// Compare against bBytes length so mismatched lengths still iterate constant work.
-	const len = bBytes.length;
-	let result = aBytes.length ^ bBytes.length;
-	for (let i = 0; i < len; i++) {
-		result |= (aBytes[i] ?? 0) ^ bBytes[i];
-	}
-	return result === 0;
-}
+  const headerToken =
+    authHeader && authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : "";
 
-export async function authMiddleware(c: Context<{ Bindings: CloudflareBindings }>, next: Next) {
-	const authHeader = c.req.header("Authorization");
+  const queryToken = (c.req.query("token") || c.req.query("key") || "").trim();
 
-	if (!authHeader || !authHeader.startsWith("Bearer ")) {
-		return c.json(ERR("UNAUTHORIZED", "Missing or invalid Authorization header"), 401);
-	}
+  const token = headerToken || queryToken;
 
-	const token = authHeader.slice(7);
+  if (!token) {
+    return c.json(ERR("UNAUTHORIZED", "Missing API token"), 401);
+  }
 
-	if (!timingSafeEqual(token, c.env.API_TOKEN)) {
-		return c.json(ERR("UNAUTHORIZED", "Invalid API token"), 401);
-	}
+  if (token !== c.env.API_TOKEN) {
+    return c.json(ERR("UNAUTHORIZED", "Invalid API token"), 401);
+  }
 
-	await next();
+  await next();
 }
