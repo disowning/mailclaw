@@ -1,36 +1,50 @@
 import { Button } from "@heroui/react";
 import { useCallback, useMemo, useState } from "react";
 import type { ClientCtx } from "@/api/client";
-import {
-	GearIcon,
-	MailIcon,
-	PencilIcon,
-	RefreshIcon,
-} from "@/components/Icons";
-import { ComposeModal, type ComposeDraft } from "@/components/ComposeModal";
+import { CodeLinksModal } from "@/components/CodeLinksModal";
+import { type ComposeDraft, ComposeModal } from "@/components/ComposeModal";
 import { EmailDetail } from "@/components/EmailDetail";
 import { FiltersBar } from "@/components/FiltersBar";
+import { GearIcon, LinkIcon, MailIcon, PencilIcon, RefreshIcon } from "@/components/Icons";
 import { InboxList } from "@/components/InboxList";
 import { SettingsModal } from "@/components/SettingsModal";
 import { SetupScreen } from "@/components/SetupScreen";
 import { useEmails } from "@/hooks/useEmails";
-import {
-	type DashboardConfig,
-	isConfigured,
-	loadConfig,
-	saveConfig,
-} from "@/lib/config";
+import { type DashboardConfig, isConfigured, loadConfig, saveConfig } from "@/lib/config";
 import { formatDate } from "@/lib/format";
 import type { Email, EmailFilters } from "@/types";
 
 const DEFAULT_FILTERS: EmailFilters = { limit: 50, offset: 0 };
 
+function initialFilters(): EmailFilters {
+	if (typeof window === "undefined") return DEFAULT_FILTERS;
+	const params = new URLSearchParams(window.location.search);
+	return {
+		...DEFAULT_FILTERS,
+		from: params.get("from") || undefined,
+		to: params.get("to") || undefined,
+		q: params.get("q") || undefined,
+	};
+}
+
+function domainFromConfig(config: DashboardConfig): string {
+	const fromDomain = config.defaultFrom.split("@")[1]?.trim();
+	if (fromDomain) return fromDomain;
+
+	try {
+		return new URL(config.host || window.location.origin).hostname;
+	} catch {
+		return "";
+	}
+}
+
 export default function App() {
 	const [config, setConfig] = useState<DashboardConfig>(() => loadConfig());
-	const [filters, setFilters] = useState<EmailFilters>(DEFAULT_FILTERS);
+	const [filters, setFilters] = useState<EmailFilters>(() => initialFilters());
 	const [selectedId, setSelectedId] = useState<string | null>(null);
 	const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
+	const [codeLinksOpen, setCodeLinksOpen] = useState(false);
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const ctx: ClientCtx = useMemo(
@@ -83,21 +97,14 @@ export default function App() {
 			<header className="flex items-center gap-3 border-b border-black/5 bg-white px-4 py-2.5">
 				<div className="flex items-center gap-2">
 					<img src="/logo.svg" alt="MailClaw" className="h-8 w-8" />
-					<div className="text-lg font-semibold tracking-tight text-black/85">
-						MailClaw
-					</div>
+					<div className="text-lg font-semibold tracking-tight text-black/85">MailClaw</div>
 				</div>
 				<div className="ml-2 hidden text-xs text-black/50 sm:block">
 					{lastFetched ? `Updated ${formatDate(lastFetched)}` : "—"}
 					{config.refreshSeconds > 0 ? ` · auto-refresh ${config.refreshSeconds}s` : ""}
 				</div>
 				<div className="ml-auto flex items-center gap-2">
-					<Button
-						size="sm"
-						variant="ghost"
-						onPress={() => void refresh()}
-						isPending={loading}
-					>
+					<Button size="sm" variant="ghost" onPress={() => void refresh()} isPending={loading}>
 						<RefreshIcon /> Refresh
 					</Button>
 					<Button
@@ -112,6 +119,9 @@ export default function App() {
 						}
 					>
 						<PencilIcon /> Compose
+					</Button>
+					<Button size="sm" variant="secondary" onPress={() => setCodeLinksOpen(true)}>
+						<LinkIcon /> Codes
 					</Button>
 					<Button
 						size="sm"
@@ -176,6 +186,13 @@ export default function App() {
 					setConfig(loadConfig());
 					setSettingsOpen(false);
 				}}
+			/>
+
+			<CodeLinksModal
+				ctx={ctx}
+				isOpen={codeLinksOpen}
+				defaultDomain={domainFromConfig(config)}
+				onClose={() => setCodeLinksOpen(false)}
 			/>
 		</div>
 	);

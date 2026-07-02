@@ -56,6 +56,29 @@ export interface SendEmailResponse {
 	provider: string;
 }
 
+export interface CodeLinkRequest {
+	domain?: string;
+	count?: number;
+	prefixes?: string[] | string;
+	emails?: string[] | string;
+	ttl_seconds?: number;
+	expires_at?: number;
+	plain?: boolean;
+}
+
+export interface CodeLinkItem {
+	email: string;
+	inbox_url: string;
+	code_url: string;
+	expires_at: number;
+}
+
+export interface CodeLinkResponse {
+	items: CodeLinkItem[];
+	total: number;
+	expires_at: number;
+}
+
 export interface ApiOk<T> {
 	success: true;
 	data: T;

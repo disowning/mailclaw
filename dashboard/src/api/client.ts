@@ -1,6 +1,8 @@
 import type {
 	ApiResponse,
 	AttachmentSummary,
+	CodeLinkRequest,
+	CodeLinkResponse,
 	Email,
 	EmailFilters,
 	EmailSummary,
@@ -94,11 +96,7 @@ export const api = {
 	},
 
 	async get(ctx: ClientCtx, id: string) {
-		const email = await call<Email>(
-			ctx.host,
-			ctx.token,
-			`/api/emails/${encodeURIComponent(id)}`,
-		);
+		const email = await call<Email>(ctx.host, ctx.token, `/api/emails/${encodeURIComponent(id)}`);
 		return normalizeEmail(email);
 	},
 
@@ -113,8 +111,13 @@ export const api = {
 			body: JSON.stringify(body),
 		}),
 
-	health: (ctx: ClientCtx) =>
-		call<{ status: string }>(ctx.host, ctx.token, "/api/health"),
+	createCodeLinks: (ctx: ClientCtx, body: CodeLinkRequest) =>
+		call<CodeLinkResponse>(ctx.host, ctx.token, "/api/code-links", {
+			method: "POST",
+			body: JSON.stringify(body),
+		}),
+
+	health: (ctx: ClientCtx) => call<{ status: string }>(ctx.host, ctx.token, "/api/health"),
 
 	attachmentUrl: (ctx: ClientCtx, emailId: string, attachmentId: string) =>
 		buildUrl(

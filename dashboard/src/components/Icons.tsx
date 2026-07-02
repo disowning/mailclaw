@@ -61,6 +61,24 @@ export function PencilIcon(props: IconProps) {
 	);
 }
 
+export function LinkIcon(props: IconProps) {
+	return (
+		<svg {...base} {...props} aria-hidden="true">
+			<path d="M10 13a5 5 0 0 0 7.1 0l2.2-2.2a5 5 0 0 0-7.1-7.1L11 4.9" />
+			<path d="M14 11a5 5 0 0 0-7.1 0l-2.2 2.2a5 5 0 0 0 7.1 7.1L13 19.1" />
+		</svg>
+	);
+}
+
+export function CopyIcon(props: IconProps) {
+	return (
+		<svg {...base} {...props} aria-hidden="true">
+			<rect x="9" y="9" width="13" height="13" rx="2" />
+			<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+		</svg>
+	);
+}
+
 export function GearIcon(props: IconProps) {
 	return (
 		<svg {...base} {...props} aria-hidden="true">
