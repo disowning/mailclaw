@@ -167,7 +167,7 @@ function normalizePrefix(value: string): string {
 function randomPrefix(): string {
 	const bytes = new Uint8Array(8);
 	crypto.getRandomValues(bytes);
-	return `mail-${base64UrlEncode(bytes).toLowerCase()}`;
+	return [...bytes].map((byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 async function importHmacKey(secret: string): Promise<CryptoKey> {

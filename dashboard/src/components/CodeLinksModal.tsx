@@ -10,7 +10,7 @@ import {
 } from "@heroui/react";
 import { type FormEvent, useEffect, useMemo, useState } from "react";
 import { ApiError, api, type ClientCtx } from "@/api/client";
-import { CopyIcon } from "@/components/Icons";
+import { CopyIcon, DownloadIcon } from "@/components/Icons";
 import type { CodeLinkItem } from "@/types";
 
 interface Props {
@@ -21,6 +21,12 @@ interface Props {
 }
 
 const DAY_SECONDS = 24 * 60 * 60;
+
+function csvCell(value: string | number): string {
+	const text = String(value);
+	if (!/[",\n\r]/.test(text)) return text;
+	return `"${text.replace(/"/g, '""')}"`;
+}
 
 export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 	const [domain, setDomain] = useState(defaultDomain);
@@ -41,10 +47,43 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 	}, [isOpen, defaultDomain]);
 
 	const csvText = useMemo(() => {
-		return items
-			.map((item) => [item.email, item.inbox_url, item.code_url, item.expires_at].join(","))
-			.join("\n");
+		const header = "email,inbox_url,code_url,expires_at";
+		const rows = items.map((item) =>
+			[item.email, item.inbox_url, item.code_url, item.expires_at].map(csvCell).join(","),
+		);
+		return [header, ...rows].join("\n");
 	}, [items]);
+
+	const txtText = useMemo(() => {
+		return items
+			.map((item) =>
+				[
+					`Email: ${item.email}`,
+					`Inbox: ${item.inbox_url}`,
+					`Code: ${item.code_url}`,
+					`Expires: ${new Date(item.expires_at * 1000).toLocaleString()}`,
+				].join("\n"),
+			)
+			.join("\n\n");
+	}, [items]);
+
+	function download(text: string, filename: string, type: string) {
+		const blob = new Blob([text], { type });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement("a");
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		a.remove();
+		setTimeout(() => URL.revokeObjectURL(url), 5000);
+	}
+
+	function filename(ext: "csv" | "txt"): string {
+		const safeDomain = (domain.trim() || "code-links").replace(/[^a-z0-9.-]+/gi, "-");
+		const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
+		return `${safeDomain}-${stamp}.${ext}`;
+	}
 
 	async function handleSubmit(e: FormEvent) {
 		e.preventDefault();
@@ -134,20 +173,38 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 								<div className="overflow-hidden rounded-lg border border-black/10 bg-white">
 									<div className="flex items-center justify-between border-b border-black/5 px-3 py-2">
 										<div className="text-sm font-medium">{items.length} link(s)</div>
-										<Button
-											type="button"
-											size="sm"
-											variant="ghost"
-											onPress={() => void copy(csvText, "batch")}
-										>
-											<CopyIcon /> Copy all
-										</Button>
+										<div className="flex gap-1">
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												onPress={() => download(txtText, filename("txt"), "text/plain")}
+											>
+												<DownloadIcon /> TXT
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												onPress={() => download(csvText, filename("csv"), "text/csv")}
+											>
+												<DownloadIcon /> CSV
+											</Button>
+											<Button
+												type="button"
+												size="sm"
+												variant="ghost"
+												onPress={() => void copy(csvText, "batch")}
+											>
+												<CopyIcon /> Copy
+											</Button>
+										</div>
 									</div>
 									<div className="max-h-[280px] overflow-y-auto">
 										{items.map((item) => (
 											<div
 												key={item.code_url}
-												className="grid gap-2 border-b border-black/5 px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[220px_1fr_auto]"
+												className="grid gap-3 border-b border-black/5 px-3 py-2 text-sm last:border-b-0 sm:grid-cols-[270px_1fr_auto]"
 											>
 												<div className="min-w-0 font-medium text-black/80">
 													<div className="truncate">{item.email}</div>
