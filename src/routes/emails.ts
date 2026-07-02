@@ -85,8 +85,10 @@ emails.get("/api/emails/export", async (c) => {
 // Clean verification code API
 emails.get("/api/code", async (c) => {
 	const to = c.req.query("to");
+	const plain = c.req.query("plain") === "1";
 
 	if (!to) {
+		if (plain) return c.text("MISSING_TO", 400);
 		return c.json(ERR("MISSING_TO", "Missing to email"), 400);
 	}
 
@@ -99,10 +101,12 @@ emails.get("/api/code", async (c) => {
 	const { emails: results, error } = await db.getEmailsExport(c.env.D1, filters);
 
 	if (error) {
+		if (plain) return c.text("D1_ERROR", 500);
 		return c.json(ERR("D1_ERROR", error.message), 500);
 	}
 
 	if (!results || results.length === 0) {
+		if (plain) return c.text("NO_EMAIL");
 		return c.json(
 			OK({
 				email: to,
@@ -122,6 +126,10 @@ emails.get("/api/code", async (c) => {
 	].join("\n");
 
 	const code = extractVerificationCode(raw);
+
+	if (plain) {
+		return c.text(code || "NO_CODE");
+	}
 
 	return c.json(
 		OK({
