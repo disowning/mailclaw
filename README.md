@@ -75,19 +75,24 @@ bun run db:tables
 bun run db:indexes
 ```
 
-### 6. Set API token
+### 6. Set secrets
 
-Generate a secure token and set it as a Worker secret:
+Generate secure tokens and set them as Worker secrets:
 
 ```bash
-# Generate a random token
+# Generate random tokens
 openssl rand -hex 32
 
-# Set it as a secret
+# Set admin API token
 bunx wrangler secret put API_TOKEN
+
+# Set signed verification-code link secret
+bunx wrangler secret put CODE_SIGNING_SECRET
 ```
 
 Save this token — you'll need it to authenticate API requests.
+
+Keep `CODE_SIGNING_SECRET` private; rotating it invalidates previously generated code links.
 
 ### 7. Deploy
 
@@ -242,6 +247,52 @@ and `Content-Disposition` set from the stored metadata.
 ```bash
 curl -H "Authorization: Bearer $TOKEN" -OJ \
   "https://mailclaw.example.com/api/emails/clx123abc/attachments/att456"
+```
+
+### Generate signed code links
+
+```
+POST /api/code-links
+```
+
+Requires the admin API token. Generates signed, expiring links for the lightweight
+verification-code API. Links are bound to one recipient address and do not require
+storing aliases in D1.
+
+**Body:**
+
+```json
+{
+  "domain": "yourdomain.com",
+  "count": 10,
+  "prefixes": ["apple01", "apple02"],
+  "emails": ["login-test@yourdomain.com"],
+  "ttl_seconds": 604800
+}
+```
+
+`emails` and `prefixes` may also be newline- or comma-separated strings. `count`
+creates random `mail-*` addresses under `domain`. The default TTL is 7 days, and
+the maximum is 90 days.
+
+```bash
+curl -X POST "https://mailclaw.example.com/api/code-links" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"domain":"yourdomain.com","count":3,"ttl_seconds":86400}'
+```
+
+### Get latest verification code
+
+```
+GET /api/code?to=<email>&exp=<unix-seconds>&sig=<signature>
+```
+
+Returns the latest extracted verification code for the signed recipient. Add
+`plain=1` to return only the code, `NO_EMAIL`, or `NO_CODE` for automation.
+
+```bash
+curl "https://mailclaw.example.com/api/code?to=mail-example@yourdomain.com&exp=1783000000&sig=...&plain=1"
 ```
 
 ### Send email
@@ -441,6 +492,7 @@ Create a `.dev.vars` file for local secrets:
 
 ```
 API_TOKEN=dev-token-here
+CODE_SIGNING_SECRET=dev-code-signing-secret
 ```
 
 Start the dev server:

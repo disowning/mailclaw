@@ -4,6 +4,7 @@
 // checking passes before `bun run cf-typegen` is run after adding the binding.
 interface CloudflareBindings {
 	API_TOKEN: string;
+	CODE_SIGNING_SECRET: string;
 	RESEND_API_KEY?: string;
 	EMAIL_PROVIDER?: string; // "resend" | "cloudflare" — defaults to "resend"
 	ATTACHMENTS: R2Bucket;

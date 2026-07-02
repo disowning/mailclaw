@@ -12,6 +12,8 @@ app.route("/", healthRoutes);
 // Auth middleware for all /api/emails routes
 app.use("/api/emails/*", authMiddleware);
 app.use("/api/emails", authMiddleware);
+app.use("/api/code-links/*", authMiddleware);
+app.use("/api/code-links", authMiddleware);
 
 // Email routes
 app.route("/", emailRoutes);

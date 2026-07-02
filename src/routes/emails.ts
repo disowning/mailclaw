@@ -2,6 +2,14 @@ import { Hono } from "hono";
 import * as db from "@/database/d1";
 import { createEmailProvider } from "@/providers";
 import type { EmailFilters, SendEmailRequest } from "@/types";
+import {
+	buildCodeLinkItem,
+	type CodeLinkRequest,
+	resolveCodeLinkEmails,
+	resolveCodeLinkExpiry,
+	signCodeLink,
+	verifyCodeLink,
+} from "@/utils/code-links";
 import { parseTimestamp } from "@/utils/helpers";
 import { ERR, OK } from "@/utils/http";
 
@@ -82,14 +90,72 @@ emails.get("/api/emails/export", async (c) => {
 	return c.json(OK({ emails: results, total, limit: filters.limit, offset: filters.offset }));
 });
 
+// Generate signed verification code links (admin only via app middleware)
+emails.post("/api/code-links", async (c) => {
+	let body: CodeLinkRequest;
+
+	try {
+		body = await c.req.json<CodeLinkRequest>();
+	} catch {
+		return c.json(ERR("INVALID_BODY", "Request body must be valid JSON"), 400);
+	}
+
+	if (!c.env.CODE_SIGNING_SECRET) {
+		return c.json(ERR("MISSING_SECRET", "CODE_SIGNING_SECRET is not configured"), 500);
+	}
+
+	try {
+		const nowSeconds = Math.floor(Date.now() / 1000);
+		const exp = resolveCodeLinkExpiry(body, nowSeconds);
+		const emailsToSign = resolveCodeLinkEmails(body);
+		const origin = new URL(c.req.url).origin;
+		const plain = body.plain !== false;
+
+		const items = await Promise.all(
+			emailsToSign.map(async (email) => {
+				const sig = await signCodeLink({ to: email, exp }, c.env.CODE_SIGNING_SECRET);
+				return buildCodeLinkItem(origin, email, exp, sig, plain);
+			}),
+		);
+
+		return c.json(OK({ items, total: items.length, expires_at: exp }));
+	} catch (err) {
+		const message = err instanceof Error ? err.message : "Failed to generate code links";
+		return c.json(ERR("INVALID_REQUEST", message), 400);
+	}
+});
+
 // Clean verification code API
 emails.get("/api/code", async (c) => {
-	const to = c.req.query("to");
+	const to = c.req.query("to")?.trim();
+	const exp = Number(c.req.query("exp"));
+	const sig = c.req.query("sig")?.trim() ?? "";
 	const plain = c.req.query("plain") === "1";
 
 	if (!to) {
 		if (plain) return c.text("MISSING_TO", 400);
 		return c.json(ERR("MISSING_TO", "Missing to email"), 400);
+	}
+
+	if (!c.env.CODE_SIGNING_SECRET) {
+		if (plain) return c.text("MISSING_SECRET", 500);
+		return c.json(ERR("MISSING_SECRET", "CODE_SIGNING_SECRET is not configured"), 500);
+	}
+
+	if (!Number.isFinite(exp) || exp <= 0 || !sig) {
+		if (plain) return c.text("INVALID_SIGNATURE", 401);
+		return c.json(ERR("INVALID_SIGNATURE", "Missing or invalid code link signature"), 401);
+	}
+
+	if (Math.floor(Date.now() / 1000) > exp) {
+		if (plain) return c.text("EXPIRED_LINK", 401);
+		return c.json(ERR("EXPIRED_LINK", "Code link has expired"), 401);
+	}
+
+	const signatureOk = await verifyCodeLink({ to, exp }, sig, c.env.CODE_SIGNING_SECRET);
+	if (!signatureOk) {
+		if (plain) return c.text("INVALID_SIGNATURE", 401);
+		return c.json(ERR("INVALID_SIGNATURE", "Invalid code link signature"), 401);
 	}
 
 	const filters: EmailFilters = {
@@ -119,11 +185,7 @@ emails.get("/api/code", async (c) => {
 
 	const mail = results[0];
 
-	const raw = [
-		mail.subject || "",
-		mail.text_content || "",
-		mail.html_content || "",
-	].join("\n");
+	const raw = [mail.subject || "", mail.text_content || "", mail.html_content || ""].join("\n");
 
 	const code = extractVerificationCode(raw);
 
