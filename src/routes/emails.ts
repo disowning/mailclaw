@@ -22,6 +22,48 @@ function parseFilters(query: Record<string, string>): EmailFilters {
 	};
 }
 
+function cleanEmailText(input: string): string {
+	return input
+		.replace(/<style[\s\S]*?<\/style>/gi, " ")
+		.replace(/<script[\s\S]*?<\/script>/gi, " ")
+		.replace(/<[^>]+>/g, " ")
+		.replace(/&nbsp;/gi, " ")
+		.replace(/&amp;/gi, "&")
+		.replace(/&lt;/gi, "<")
+		.replace(/&gt;/gi, ">")
+		.replace(/&quot;/gi, '"')
+		.replace(/&#39;/gi, "'")
+		.replace(/&#(\d+);/g, (_, n) => {
+			try {
+				return String.fromCharCode(Number(n));
+			} catch {
+				return " ";
+			}
+		})
+		.replace(/&[a-z]+;/gi, " ")
+		.replace(/\s+/g, " ")
+		.trim();
+}
+
+function extractVerificationCode(input: string): string {
+	const text = cleanEmailText(input);
+
+	const patterns = [
+		/(?:验证码|校验码|动态码|确认码|安全码|一次性密码|一次性验证码|otp|verification code|security code|login code|code)[^\d]{0,120}(\d{4,8})/i,
+		/(\d{4,8})[^\d]{0,80}(?:验证码|校验码|动态码|确认码|安全码|一次性密码|otp|code)/i,
+		/\b(\d{4,8})\b/,
+	];
+
+	for (const pattern of patterns) {
+		const match = text.match(pattern);
+		if (match?.[1]) {
+			return match[1];
+		}
+	}
+
+	return "";
+}
+
 // List emails (metadata only)
 emails.get("/api/emails", async (c) => {
 	const filters = parseFilters(c.req.query());
@@ -38,6 +80,60 @@ emails.get("/api/emails/export", async (c) => {
 
 	if (error) return c.json(ERR("D1_ERROR", error.message), 500);
 	return c.json(OK({ emails: results, total, limit: filters.limit, offset: filters.offset }));
+});
+
+// Clean verification code API
+emails.get("/api/code", async (c) => {
+	const to = c.req.query("to");
+
+	if (!to) {
+		return c.json(ERR("MISSING_TO", "Missing to email"), 400);
+	}
+
+	const filters: EmailFilters = {
+		to,
+		limit: 1,
+		offset: 0,
+	};
+
+	const { emails: results, error } = await db.getEmailsExport(c.env.D1, filters);
+
+	if (error) {
+		return c.json(ERR("D1_ERROR", error.message), 500);
+	}
+
+	if (!results || results.length === 0) {
+		return c.json(
+			OK({
+				email: to,
+				found: false,
+				code: "",
+				message: "No email found",
+			}),
+		);
+	}
+
+	const mail = results[0];
+
+	const raw = [
+		mail.subject || "",
+		mail.text_content || "",
+		mail.html_content || "",
+	].join("\n");
+
+	const code = extractVerificationCode(raw);
+
+	return c.json(
+		OK({
+			email: mail.to_address,
+			found: !!code,
+			code,
+			subject: mail.subject,
+			from: mail.from_address,
+			received_at: mail.received_at,
+			id: mail.id,
+		}),
+	);
 });
 
 // List attachment metadata for an email
@@ -66,14 +162,15 @@ emails.get("/api/emails/:id/attachments/:attachmentId", async (c) => {
 	if (!object) return c.json(ERR("NOT_FOUND", "Attachment content missing"), 404);
 
 	const filename = attachment.filename || attachment.id;
-	// RFC 5987 encoding so non-ASCII filenames survive the header.
 	const encodedName = encodeURIComponent(filename);
+
 	c.header("Content-Type", attachment.mime_type || "application/octet-stream");
 	c.header("Content-Length", String(attachment.size));
 	c.header(
 		"Content-Disposition",
 		`attachment; filename="${filename.replace(/"/g, "")}"; filename*=UTF-8''${encodedName}`,
 	);
+
 	return c.body(object.body);
 });
 
@@ -100,12 +197,14 @@ emails.delete("/api/emails/:id", async (c) => {
 	if (keys.length > 0) {
 		await c.env.ATTACHMENTS.delete(keys);
 	}
+
 	return c.json(OK({ message: "Email deleted" }));
 });
 
 // Send email
 emails.post("/api/emails/send", async (c) => {
 	let body: SendEmailRequest;
+
 	try {
 		body = await c.req.json<SendEmailRequest>();
 	} catch {
