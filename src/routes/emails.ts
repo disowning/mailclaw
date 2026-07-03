@@ -22,12 +22,19 @@ function parseFilters(query: Record<string, string>): EmailFilters {
 	return {
 		from: query.from || undefined,
 		to: query.to || undefined,
+		domain: query.domain || query.to_domain || undefined,
 		q: query.q || undefined,
 		after: query.after ? (parseTimestamp(query.after) ?? undefined) : undefined,
 		before: query.before ? (parseTimestamp(query.before) ?? undefined) : undefined,
 		limit,
 		offset,
 	};
+}
+
+function hasDeleteFilters(filters: EmailFilters): boolean {
+	return Boolean(
+		filters.from || filters.to || filters.domain || filters.q || filters.after || filters.before,
+	);
 }
 
 function cleanEmailText(input: string): string {
@@ -272,6 +279,23 @@ emails.delete("/api/emails/:id", async (c) => {
 	}
 
 	return c.json(OK({ message: "Email deleted" }));
+});
+
+// Delete recent emails matching filters (and their attachments from R2)
+emails.delete("/api/emails", async (c) => {
+	const filters = parseFilters(c.req.query());
+	if (!hasDeleteFilters(filters)) {
+		return c.json(ERR("FILTER_REQUIRED", "Refine filters before deleting emails"), 400);
+	}
+
+	const { deleted, keys, error } = await db.deleteEmailsByFilters(c.env.D1, filters);
+	if (error) return c.json(ERR("D1_ERROR", error.message), 500);
+
+	if (keys.length > 0) {
+		await c.env.ATTACHMENTS.delete(keys);
+	}
+
+	return c.json(OK({ deleted, limit: filters.limit }));
 });
 
 // Send email

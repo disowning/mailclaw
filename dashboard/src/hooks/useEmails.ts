@@ -74,7 +74,7 @@ export function useEmails(
 	useEffect(() => {
 		isFirstFetchRef.current = true;
 		latestSeenRef.current = null;
-	}, [filters.q, filters.from, filters.to, filters.after, filters.before]);
+	}, [filters.q, filters.from, filters.to, filters.domain, filters.after, filters.before]);
 
 	// Polling.
 	useEffect(() => {

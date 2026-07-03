@@ -3,6 +3,7 @@ import type {
 	AttachmentSummary,
 	CodeLinkRequest,
 	CodeLinkResponse,
+	DeleteEmailsResponse,
 	Email,
 	EmailFilters,
 	EmailSummary,
@@ -103,6 +104,12 @@ export const api = {
 	delete: (ctx: ClientCtx, id: string) =>
 		call<{ message: string }>(ctx.host, ctx.token, `/api/emails/${encodeURIComponent(id)}`, {
 			method: "DELETE",
+		}),
+
+	deleteFiltered: (ctx: ClientCtx, filters: EmailFilters) =>
+		call<DeleteEmailsResponse>(ctx.host, ctx.token, "/api/emails", {
+			method: "DELETE",
+			params: filters as Record<string, unknown>,
 		}),
 
 	send: (ctx: ClientCtx, body: SendEmailRequest) =>

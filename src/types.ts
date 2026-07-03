@@ -30,6 +30,7 @@ export type AttachmentSummary = Omit<Attachment, "r2_key">;
 export interface EmailFilters {
 	from?: string;
 	to?: string;
+	domain?: string;
 	q?: string;
 	after?: number;
 	before?: number;

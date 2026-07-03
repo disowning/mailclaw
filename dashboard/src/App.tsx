@@ -1,6 +1,6 @@
 import { Button } from "@heroui/react";
 import { useCallback, useMemo, useState } from "react";
-import type { ClientCtx } from "@/api/client";
+import { ApiError, api, type ClientCtx } from "@/api/client";
 import { CodeLinksModal } from "@/components/CodeLinksModal";
 import { type ComposeDraft, ComposeModal } from "@/components/ComposeModal";
 import { EmailDetail } from "@/components/EmailDetail";
@@ -23,6 +23,7 @@ function initialFilters(): EmailFilters {
 		...DEFAULT_FILTERS,
 		from: params.get("from") || undefined,
 		to: params.get("to") || undefined,
+		domain: params.get("domain") || undefined,
 		q: params.get("q") || undefined,
 	};
 }
@@ -45,6 +46,7 @@ export default function App() {
 	const [composeDraft, setComposeDraft] = useState<ComposeDraft | null>(null);
 	const [settingsOpen, setSettingsOpen] = useState(false);
 	const [codeLinksOpen, setCodeLinksOpen] = useState(false);
+	const [deletingFiltered, setDeletingFiltered] = useState(false);
 	const [refreshKey, setRefreshKey] = useState(0);
 
 	const ctx: ClientCtx = useMemo(
@@ -92,6 +94,37 @@ export default function App() {
 		});
 	}
 
+	async function handleDeleteFiltered() {
+		const hasFilters = Boolean(
+			filters.from || filters.to || filters.domain || filters.q || filters.after || filters.before,
+		);
+		if (!hasFilters) {
+			window.alert("Set a filter before deleting emails.");
+			return;
+		}
+
+		const target =
+			filters.to ||
+			(filters.domain ? `*@${filters.domain}` : filters.from || filters.q || "current filters");
+		const ok = window.confirm(
+			`Delete up to 500 recent email(s) matching ${target}? This cannot be undone.`,
+		);
+		if (!ok) return;
+
+		setDeletingFiltered(true);
+		try {
+			const result = await api.deleteFiltered(ctx, { ...filters, limit: 500, offset: 0 });
+			setSelectedId(null);
+			await refresh();
+			window.alert(`Deleted ${result.deleted} email(s).`);
+		} catch (err) {
+			const msg = err instanceof ApiError ? `${err.code}: ${err.message}` : String(err);
+			window.alert(msg);
+		} finally {
+			setDeletingFiltered(false);
+		}
+	}
+
 	return (
 		<div className="flex h-screen flex-col bg-[#f6f8fa]">
 			<header className="flex items-center gap-3 border-b border-black/5 bg-white px-4 py-2.5">
@@ -137,7 +170,12 @@ export default function App() {
 
 			<div className="flex min-h-0 flex-1">
 				<aside className="flex w-[380px] min-w-[320px] flex-col border-r border-black/5">
-					<FiltersBar value={filters} onChange={setFilters} />
+					<FiltersBar
+						value={filters}
+						onChange={setFilters}
+						onDeleteFiltered={handleDeleteFiltered}
+						deleting={deletingFiltered}
+					/>
 					<InboxList
 						key={refreshKey}
 						data={data}

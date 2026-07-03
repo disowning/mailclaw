@@ -33,6 +33,7 @@ export interface PaginatedEmails<T = EmailSummary> {
 export interface EmailFilters {
 	from?: string;
 	to?: string;
+	domain?: string;
 	q?: string;
 	after?: string;
 	before?: string;
@@ -77,6 +78,11 @@ export interface CodeLinkResponse {
 	items: CodeLinkItem[];
 	total: number;
 	expires_at: number;
+}
+
+export interface DeleteEmailsResponse {
+	deleted: number;
+	limit: number;
 }
 
 export interface ApiOk<T> {

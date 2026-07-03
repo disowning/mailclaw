@@ -33,12 +33,16 @@ function buildWhereClause(filters: EmailFilters): { where: string; params: unkno
 	const params: unknown[] = [];
 
 	if (filters.from) {
-		conditions.push("from_address = ?");
+		conditions.push("LOWER(from_address) = LOWER(?)");
 		params.push(filters.from);
 	}
 	if (filters.to) {
-		conditions.push("to_address = ?");
+		conditions.push("LOWER(to_address) = LOWER(?)");
 		params.push(filters.to);
+	}
+	if (filters.domain) {
+		conditions.push("LOWER(to_address) LIKE ?");
+		params.push(`%@${filters.domain.toLowerCase().replace(/^@/, "")}`);
 	}
 	if (filters.q) {
 		conditions.push("(subject LIKE ? OR text_content LIKE ?)");
@@ -218,4 +222,56 @@ export async function deleteEmailById(db: D1Database, id: string) {
 	} catch (e: unknown) {
 		return { deleted: false, error: e instanceof Error ? e : new Error(String(e)) };
 	}
+}
+
+export async function deleteEmailsByFilters(db: D1Database, filters: EmailFilters) {
+	try {
+		const { where, params } = buildWhereClause(filters);
+		const limit = Math.min(Math.max(filters.limit || 100, 1), 500);
+
+		const { results } = await db
+			.prepare(
+				`SELECT id FROM emails ${where}
+				 ORDER BY received_at DESC
+				 LIMIT ?`,
+			)
+			.bind(...params, limit)
+			.all<{ id: string }>();
+
+		const ids = results.map((row) => row.id);
+		if (ids.length === 0) {
+			return { deleted: 0, keys: [], error: undefined };
+		}
+
+		const keys: string[] = [];
+		for (const chunk of chunkArray(ids, 50)) {
+			const placeholders = chunk.map(() => "?").join(", ");
+			const { results: rows } = await db
+				.prepare(`SELECT r2_key FROM attachments WHERE email_id IN (${placeholders})`)
+				.bind(...chunk)
+				.all<{ r2_key: string }>();
+			keys.push(...rows.map((row) => row.r2_key));
+
+			await db
+				.prepare(`DELETE FROM attachments WHERE email_id IN (${placeholders})`)
+				.bind(...chunk)
+				.run();
+			await db
+				.prepare(`DELETE FROM emails WHERE id IN (${placeholders})`)
+				.bind(...chunk)
+				.run();
+		}
+
+		return { deleted: ids.length, keys, error: undefined };
+	} catch (e: unknown) {
+		return { deleted: 0, keys: [], error: e instanceof Error ? e : new Error(String(e)) };
+	}
+}
+
+function chunkArray<T>(items: T[], size: number): T[][] {
+	const chunks: T[][] = [];
+	for (let i = 0; i < items.length; i += size) {
+		chunks.push(items.slice(i, i + size));
+	}
+	return chunks;
 }
