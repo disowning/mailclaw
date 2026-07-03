@@ -156,7 +156,7 @@ export function buildCodeLinkItem(
 }
 
 function normalizeEmail(value: string): string {
-	const email = value.trim();
+	const email = value.trim().toLowerCase();
 	if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
 		throw new Error(`Invalid email: ${value}`);
 	}
@@ -172,7 +172,7 @@ function normalizeDomain(value: string): string {
 }
 
 function normalizePrefix(value: string): string {
-	const prefix = value.trim().replace(/@.*$/, "");
+	const prefix = value.trim().toLowerCase().replace(/@.*$/, "");
 	if (!/^[a-z0-9._+-]{1,64}$/i.test(prefix)) {
 		throw new Error(`Invalid email prefix: ${value}`);
 	}

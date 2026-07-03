@@ -58,6 +58,9 @@ function saveDomains(domains: string[]) {
 export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 	const [domainsText, setDomainsText] = useState(defaultDomain);
 	const [savedDomains, setSavedDomains] = useState<string[]>(() => loadSavedDomains(defaultDomain));
+	const [selectedDomains, setSelectedDomains] = useState<string[]>(() =>
+		parseDomains(defaultDomain),
+	);
 	const [count, setCount] = useState(3);
 	const [ttlDays, setTtlDays] = useState(7);
 	const [prefixes, setPrefixes] = useState("");
@@ -72,11 +75,16 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 		const nextSaved = loadSavedDomains(defaultDomain);
 		setSavedDomains(nextSaved);
 		setDomainsText((current) => current || nextSaved[0] || defaultDomain);
+		setSelectedDomains((current) => (current.length > 0 ? current : nextSaved.slice(0, 1)));
 		setError(null);
 		setCopied(null);
 	}, [isOpen, defaultDomain]);
 
-	const activeDomains = useMemo(() => parseDomains(domainsText), [domainsText]);
+	const typedDomains = useMemo(() => parseDomains(domainsText), [domainsText]);
+	const activeDomains = useMemo(() => {
+		if (selectedDomains.length > 0) return selectedDomains;
+		return typedDomains;
+	}, [selectedDomains, typedDomains]);
 
 	const csvText = useMemo(() => {
 		const header = "email,inbox_url,code_url,expires_at";
@@ -125,7 +133,7 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 
 		try {
 			const result = await api.createCodeLinks(ctx, {
-				domain: domainsText.trim() || undefined,
+				domain: activeDomains,
 				count: Math.max(0, Math.floor(count || 0)),
 				prefixes: prefixes.trim() || undefined,
 				emails: emails.trim() || undefined,
@@ -133,8 +141,8 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 				plain: true,
 			});
 			setItems(result.items);
-			if (activeDomains.length > 0) {
-				const nextSaved = [...new Set([...savedDomains, ...activeDomains])];
+			if (typedDomains.length > 0) {
+				const nextSaved = [...new Set([...savedDomains, ...typedDomains])];
 				setSavedDomains(nextSaved);
 				saveDomains(nextSaved);
 			}
@@ -151,16 +159,32 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 		setCopied(label);
 	}
 
-	function selectDomain(domain: string) {
-		setDomainsText(domain);
+	function toggleDomain(domain: string) {
+		setSelectedDomains((current) =>
+			current.includes(domain) ? current.filter((item) => item !== domain) : [...current, domain],
+		);
 	}
 
 	function saveTypedDomains() {
-		if (activeDomains.length === 0) return;
-		const nextSaved = [...new Set([...savedDomains, ...activeDomains])];
+		if (typedDomains.length === 0) return;
+		const nextSaved = [...new Set([...savedDomains, ...typedDomains])];
 		setSavedDomains(nextSaved);
 		saveDomains(nextSaved);
-		setCopied(`${activeDomains.length} domain(s)`);
+		setSelectedDomains((current) => [...new Set([...current, ...typedDomains])]);
+		setCopied(`${typedDomains.length} domain(s)`);
+	}
+
+	function selectOnly(domain: string) {
+		setSelectedDomains([domain]);
+		setDomainsText(domain);
+	}
+
+	function selectAllDomains() {
+		setSelectedDomains(savedDomains);
+	}
+
+	function clearSelectedDomains() {
+		setSelectedDomains([]);
 	}
 
 	return (
@@ -178,7 +202,7 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 									<Label>Domains</Label>
 									<TextArea rows={3} placeholder={"grokghibli.com\nmusicaldown.pro"} />
 									<Description>
-										One per line or comma-separated. Random and prefixes apply to every domain.
+										Add or paste domains here, then save them. Selected saved domains are used.
 									</Description>
 								</TextField>
 								<NumberField
@@ -202,18 +226,27 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 							</div>
 
 							<div className="flex flex-wrap items-center gap-2 text-xs text-black/55">
-								<span>{savedDomains.length} saved domain(s)</span>
+								<span>
+									{savedDomains.length} saved, {activeDomains.length} selected
+								</span>
 								{savedDomains.map((domain) => (
 									<Button
 										key={domain}
 										type="button"
 										size="sm"
-										variant={activeDomains.includes(domain) ? "secondary" : "ghost"}
-										onPress={() => selectDomain(domain)}
+										variant={selectedDomains.includes(domain) ? "secondary" : "ghost"}
+										onPress={() => toggleDomain(domain)}
+										onDoubleClick={() => selectOnly(domain)}
 									>
 										{domain}
 									</Button>
 								))}
+								<Button type="button" size="sm" variant="ghost" onPress={selectAllDomains}>
+									All
+								</Button>
+								<Button type="button" size="sm" variant="ghost" onPress={clearSelectedDomains}>
+									None
+								</Button>
 								<Button type="button" size="sm" variant="ghost" onPress={saveTypedDomains}>
 									Save domains
 								</Button>

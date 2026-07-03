@@ -127,12 +127,13 @@ emails.post("/api/code-links", async (c) => {
 
 // Clean verification code API
 emails.get("/api/code", async (c) => {
-	const to = c.req.query("to")?.trim();
+	const rawTo = c.req.query("to")?.trim();
+	const to = rawTo?.toLowerCase();
 	const exp = Number(c.req.query("exp"));
 	const sig = c.req.query("sig")?.trim() ?? "";
 	const plain = c.req.query("plain") === "1";
 
-	if (!to) {
+	if (!rawTo || !to) {
 		if (plain) return c.text("MISSING_TO", 400);
 		return c.json(ERR("MISSING_TO", "Missing to email"), 400);
 	}
@@ -152,7 +153,9 @@ emails.get("/api/code", async (c) => {
 		return c.json(ERR("EXPIRED_LINK", "Code link has expired"), 401);
 	}
 
-	const signatureOk = await verifyCodeLink({ to, exp }, sig, c.env.CODE_SIGNING_SECRET);
+	const signatureOk =
+		(await verifyCodeLink({ to, exp }, sig, c.env.CODE_SIGNING_SECRET)) ||
+		(await verifyCodeLink({ to: rawTo, exp }, sig, c.env.CODE_SIGNING_SECRET));
 	if (!signatureOk) {
 		if (plain) return c.text("INVALID_SIGNATURE", 401);
 		return c.json(ERR("INVALID_SIGNATURE", "Invalid code link signature"), 401);
