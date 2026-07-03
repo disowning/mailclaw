@@ -32,7 +32,7 @@ function domainFromConfig(config: DashboardConfig): string {
 	if (fromDomain) return fromDomain;
 
 	try {
-		return new URL(config.host || window.location.origin).hostname;
+		return new URL(config.host || window.location.origin).hostname.replace(/^mail\./, "");
 	} catch {
 		return "";
 	}

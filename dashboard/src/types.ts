@@ -57,7 +57,7 @@ export interface SendEmailResponse {
 }
 
 export interface CodeLinkRequest {
-	domain?: string;
+	domain?: string[] | string;
 	count?: number;
 	prefixes?: string[] | string;
 	emails?: string[] | string;

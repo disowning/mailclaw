@@ -15,7 +15,7 @@ export interface CodeLinkItem {
 }
 
 export interface CodeLinkRequest {
-	domain?: string;
+	domain?: string[] | string;
 	count?: number;
 	prefixes?: string[] | string;
 	emails?: string[] | string;
@@ -56,9 +56,11 @@ export function resolveCodeLinkEmails(body: CodeLinkRequest): string[] {
 
 	const prefixes = toList(body.prefixes);
 	if (prefixes.length > 0) {
-		const domain = normalizeDomain(body.domain);
-		for (const prefix of prefixes) {
-			emails.add(`${normalizePrefix(prefix)}@${domain}`);
+		const domains = normalizeDomains(body.domain);
+		for (const domain of domains) {
+			for (const prefix of prefixes) {
+				emails.add(`${normalizePrefix(prefix)}@${domain}`);
+			}
 		}
 	}
 
@@ -70,9 +72,14 @@ export function resolveCodeLinkEmails(body: CodeLinkRequest): string[] {
 		throw new Error(`Cannot generate more than ${MAX_LINK_COUNT} links at once`);
 	}
 	if (count > 0) {
-		const domain = normalizeDomain(body.domain);
-		for (let i = 0; i < count; i += 1) {
-			emails.add(`${randomPrefix()}@${domain}`);
+		const domains = normalizeDomains(body.domain);
+		if (domains.length * count > MAX_LINK_COUNT) {
+			throw new Error(`Cannot generate more than ${MAX_LINK_COUNT} links at once`);
+		}
+		for (const domain of domains) {
+			for (let i = 0; i < count; i += 1) {
+				emails.add(`${randomPrefix()}@${domain}`);
+			}
 		}
 	}
 
@@ -97,6 +104,14 @@ function toList(value: string[] | string | undefined): string[] {
 		.split(/[\r\n,]+/)
 		.map((item) => item.trim())
 		.filter(Boolean);
+}
+
+function normalizeDomains(value: string[] | string | undefined): string[] {
+	const domains = [...new Set(toList(value).map(normalizeDomain))];
+	if (domains.length === 0) {
+		throw new Error("domain is required when using prefixes or count");
+	}
+	return domains;
 }
 
 export async function signCodeLink(input: CodeLinkInput, secret: string): Promise<string> {
@@ -148,10 +163,10 @@ function normalizeEmail(value: string): string {
 	return email;
 }
 
-function normalizeDomain(value: string | undefined): string {
-	const domain = value?.trim().toLowerCase().replace(/^@/, "") ?? "";
+function normalizeDomain(value: string): string {
+	const domain = value.trim().toLowerCase().replace(/^@/, "");
 	if (!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(domain)) {
-		throw new Error("domain is required when using prefixes or count");
+		throw new Error(`Invalid domain: ${value}`);
 	}
 	return domain;
 }

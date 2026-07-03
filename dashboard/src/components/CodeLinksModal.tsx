@@ -21,6 +21,7 @@ interface Props {
 }
 
 const DAY_SECONDS = 24 * 60 * 60;
+const SAVED_DOMAINS_KEY = "mailclaw:code-link-domains";
 
 function csvCell(value: string | number): string {
 	const text = String(value);
@@ -28,8 +29,35 @@ function csvCell(value: string | number): string {
 	return `"${text.replace(/"/g, '""')}"`;
 }
 
+function parseDomains(value: string): string[] {
+	return [
+		...new Set(
+			value
+				.split(/[\s,]+/)
+				.map((item) => item.trim().toLowerCase().replace(/^@/, ""))
+				.filter(Boolean),
+		),
+	];
+}
+
+function loadSavedDomains(defaultDomain: string): string[] {
+	const defaults = parseDomains(defaultDomain);
+	try {
+		const raw = localStorage.getItem(SAVED_DOMAINS_KEY);
+		const parsed = raw ? (JSON.parse(raw) as string[]) : [];
+		return [...new Set([...defaults, ...parsed.flatMap(parseDomains)])];
+	} catch {
+		return defaults;
+	}
+}
+
+function saveDomains(domains: string[]) {
+	localStorage.setItem(SAVED_DOMAINS_KEY, JSON.stringify(domains));
+}
+
 export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
-	const [domain, setDomain] = useState(defaultDomain);
+	const [domainsText, setDomainsText] = useState(defaultDomain);
+	const [savedDomains, setSavedDomains] = useState<string[]>(() => loadSavedDomains(defaultDomain));
 	const [count, setCount] = useState(3);
 	const [ttlDays, setTtlDays] = useState(7);
 	const [prefixes, setPrefixes] = useState("");
@@ -41,10 +69,14 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 
 	useEffect(() => {
 		if (!isOpen) return;
-		setDomain((current) => current || defaultDomain);
+		const nextSaved = loadSavedDomains(defaultDomain);
+		setSavedDomains(nextSaved);
+		setDomainsText((current) => current || nextSaved[0] || defaultDomain);
 		setError(null);
 		setCopied(null);
 	}, [isOpen, defaultDomain]);
+
+	const activeDomains = useMemo(() => parseDomains(domainsText), [domainsText]);
 
 	const csvText = useMemo(() => {
 		const header = "email,inbox_url,code_url,expires_at";
@@ -80,7 +112,7 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 	}
 
 	function filename(ext: "csv" | "txt"): string {
-		const safeDomain = (domain.trim() || "code-links").replace(/[^a-z0-9.-]+/gi, "-");
+		const safeDomain = (activeDomains.join("_") || "code-links").replace(/[^a-z0-9.-]+/gi, "-");
 		const stamp = new Date().toISOString().slice(0, 19).replace(/[-:T]/g, "");
 		return `${safeDomain}-${stamp}.${ext}`;
 	}
@@ -93,7 +125,7 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 
 		try {
 			const result = await api.createCodeLinks(ctx, {
-				domain: domain.trim() || undefined,
+				domain: domainsText.trim() || undefined,
 				count: Math.max(0, Math.floor(count || 0)),
 				prefixes: prefixes.trim() || undefined,
 				emails: emails.trim() || undefined,
@@ -101,6 +133,11 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 				plain: true,
 			});
 			setItems(result.items);
+			if (activeDomains.length > 0) {
+				const nextSaved = [...new Set([...savedDomains, ...activeDomains])];
+				setSavedDomains(nextSaved);
+				saveDomains(nextSaved);
+			}
 		} catch (err) {
 			const msg = err instanceof ApiError ? `${err.code}: ${err.message}` : String(err);
 			setError(msg);
@@ -114,6 +151,18 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 		setCopied(label);
 	}
 
+	function selectDomain(domain: string) {
+		setDomainsText(domain);
+	}
+
+	function saveTypedDomains() {
+		if (activeDomains.length === 0) return;
+		const nextSaved = [...new Set([...savedDomains, ...activeDomains])];
+		setSavedDomains(nextSaved);
+		saveDomains(nextSaved);
+		setCopied(`${activeDomains.length} domain(s)`);
+	}
+
 	return (
 		<Modal.Backdrop isOpen={isOpen} onOpenChange={(open) => !open && onClose()}>
 			<Modal.Container placement="center">
@@ -125,10 +174,12 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 					<form onSubmit={handleSubmit}>
 						<Modal.Body className="flex max-h-[76vh] flex-col gap-4 overflow-y-auto">
 							<div className="grid gap-3 sm:grid-cols-[1fr_140px_140px]">
-								<TextField name="domain" value={domain} onChange={setDomain} fullWidth>
-									<Label>Domain</Label>
-									<Input placeholder="example.com" />
-									<Description>Used for random addresses and prefixes.</Description>
+								<TextField name="domains" value={domainsText} onChange={setDomainsText} fullWidth>
+									<Label>Domains</Label>
+									<TextArea rows={3} placeholder={"grokghibli.com\nmusicaldown.pro"} />
+									<Description>
+										One per line or comma-separated. Random and prefixes apply to every domain.
+									</Description>
 								</TextField>
 								<NumberField
 									value={count}
@@ -148,6 +199,24 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 									<Label>Days</Label>
 									<Input />
 								</NumberField>
+							</div>
+
+							<div className="flex flex-wrap items-center gap-2 text-xs text-black/55">
+								<span>{savedDomains.length} saved domain(s)</span>
+								{savedDomains.map((domain) => (
+									<Button
+										key={domain}
+										type="button"
+										size="sm"
+										variant={activeDomains.includes(domain) ? "secondary" : "ghost"}
+										onPress={() => selectDomain(domain)}
+									>
+										{domain}
+									</Button>
+								))}
+								<Button type="button" size="sm" variant="ghost" onPress={saveTypedDomains}>
+									Save domains
+								</Button>
 							</div>
 
 							<div className="grid gap-3 sm:grid-cols-2">
