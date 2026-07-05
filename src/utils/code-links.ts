@@ -59,7 +59,7 @@ export function resolveCodeLinkEmails(body: CodeLinkRequest): string[] {
 		const domains = normalizeDomains(body.domain);
 		for (const domain of domains) {
 			for (const prefix of prefixes) {
-				emails.add(uniqueAddress(normalizePrefix(prefix), domain, emails));
+				emails.add(`${normalizePrefix(prefix)}@${domain}`);
 			}
 		}
 	}
@@ -177,18 +177,6 @@ function normalizePrefix(value: string): string {
 		throw new Error(`Invalid email prefix: ${value}`);
 	}
 	return prefix;
-}
-
-function uniqueAddress(prefix: string, domain: string, used: Set<string>): string {
-	let email = `${prefix}@${domain}`;
-	let suffix = 2;
-
-	while (used.has(email)) {
-		email = `${prefix}-${suffix}@${domain}`;
-		suffix += 1;
-	}
-
-	return email;
 }
 
 function randomPrefix(): string {

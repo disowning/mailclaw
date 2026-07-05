@@ -94,8 +94,19 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 	}, [selectedDomains, typedDomains]);
 	const prefixCount = useMemo(() => parseList(prefixes).length, [prefixes]);
 	const fullEmailCount = useMemo(() => parseList(emails).length, [emails]);
+	const uniquePrefixCount = useMemo(
+		() => new Set(parseList(prefixes).map((item) => item.toLowerCase().replace(/@.*$/, ""))).size,
+		[prefixes],
+	);
+	const uniqueFullEmailCount = useMemo(
+		() => new Set(parseList(emails).map((item) => item.toLowerCase())).size,
+		[emails],
+	);
 	const expectedCount =
 		activeDomains.length * (prefixCount + Math.max(0, Math.floor(count || 0))) + fullEmailCount;
+	const expectedUniqueCount =
+		activeDomains.length * (uniquePrefixCount + Math.max(0, Math.floor(count || 0))) +
+		uniqueFullEmailCount;
 
 	const csvText = useMemo(() => {
 		const header = "email,inbox_url,code_url,expires_at";
@@ -267,9 +278,7 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 								<TextField name="prefixes" value={prefixes} onChange={setPrefixes} fullWidth>
 									<Label>Prefixes</Label>
 									<TextArea rows={5} placeholder={"apple01\napple02\nlogin-test"} />
-									<Description>
-										{prefixCount} imported. Repeated names get -2, -3 suffixes.
-									</Description>
+									<Description>{prefixCount} imported username(s).</Description>
 								</TextField>
 								<TextField name="emails" value={emails} onChange={setEmails} fullWidth>
 									<Label>Full emails</Label>
@@ -279,8 +288,8 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 							</div>
 
 							<div className="text-xs text-black/50">
-								Expected output: up to {expectedCount} link(s) across {activeDomains.length}{" "}
-								selected domain(s).
+								Imported total: {expectedCount}. Expected unique output: {expectedUniqueCount}{" "}
+								link(s) across {activeDomains.length} selected domain(s).
 							</div>
 
 							{error ? (
