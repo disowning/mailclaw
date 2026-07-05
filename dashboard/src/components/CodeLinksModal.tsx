@@ -40,6 +40,13 @@ function parseDomains(value: string): string[] {
 	];
 }
 
+function parseList(value: string): string[] {
+	return value
+		.split(/[\r\n,;\t]+/)
+		.map((item) => item.trim())
+		.filter(Boolean);
+}
+
 function loadSavedDomains(defaultDomain: string): string[] {
 	const defaults = parseDomains(defaultDomain);
 	try {
@@ -85,6 +92,10 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 		if (selectedDomains.length > 0) return selectedDomains;
 		return typedDomains;
 	}, [selectedDomains, typedDomains]);
+	const prefixCount = useMemo(() => parseList(prefixes).length, [prefixes]);
+	const fullEmailCount = useMemo(() => parseList(emails).length, [emails]);
+	const expectedCount =
+		activeDomains.length * (prefixCount + Math.max(0, Math.floor(count || 0))) + fullEmailCount;
 
 	const csvText = useMemo(() => {
 		const header = "email,inbox_url,code_url,expires_at";
@@ -256,13 +267,20 @@ export function CodeLinksModal({ ctx, isOpen, defaultDomain, onClose }: Props) {
 								<TextField name="prefixes" value={prefixes} onChange={setPrefixes} fullWidth>
 									<Label>Prefixes</Label>
 									<TextArea rows={5} placeholder={"apple01\napple02\nlogin-test"} />
-									<Description>One per line. The domain above will be added.</Description>
+									<Description>
+										{prefixCount} imported. Repeated names get -2, -3 suffixes.
+									</Description>
 								</TextField>
 								<TextField name="emails" value={emails} onChange={setEmails} fullWidth>
 									<Label>Full emails</Label>
 									<TextArea rows={5} placeholder={"apple01@example.com\napple02@example.com"} />
-									<Description>Use this when you already have exact addresses.</Description>
+									<Description>{fullEmailCount} imported exact address(es).</Description>
 								</TextField>
+							</div>
+
+							<div className="text-xs text-black/50">
+								Expected output: up to {expectedCount} link(s) across {activeDomains.length}{" "}
+								selected domain(s).
 							</div>
 
 							{error ? (
