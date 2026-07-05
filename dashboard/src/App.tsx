@@ -25,6 +25,8 @@ function initialFilters(): EmailFilters {
 		to: params.get("to") || undefined,
 		domain: params.get("domain") || undefined,
 		q: params.get("q") || undefined,
+		after: params.get("after") || undefined,
+		before: params.get("before") || undefined,
 	};
 }
 
@@ -107,16 +109,21 @@ export default function App() {
 			filters.to ||
 			(filters.domain ? `*@${filters.domain}` : filters.from || filters.q || "current filters");
 		const ok = window.confirm(
-			`Delete up to 500 recent email(s) matching ${target}? This cannot be undone.`,
+			`Delete all email(s) matching ${target} in batches of 500? This cannot be undone.`,
 		);
 		if (!ok) return;
 
 		setDeletingFiltered(true);
 		try {
-			const result = await api.deleteFiltered(ctx, { ...filters, limit: 500, offset: 0 });
+			let totalDeleted = 0;
+			for (let batch = 0; batch < 100; batch += 1) {
+				const result = await api.deleteFiltered(ctx, { ...filters, limit: 500, offset: 0 });
+				totalDeleted += result.deleted;
+				if (result.deleted < result.limit) break;
+			}
 			setSelectedId(null);
 			await refresh();
-			window.alert(`Deleted ${result.deleted} email(s).`);
+			window.alert(`Deleted ${totalDeleted} email(s).`);
 		} catch (err) {
 			const msg = err instanceof ApiError ? `${err.code}: ${err.message}` : String(err);
 			window.alert(msg);

@@ -14,13 +14,17 @@ export function FiltersBar({ value, onChange, onDeleteFiltered, deleting = false
 	const [from, setFrom] = useState(value.from ?? "");
 	const [to, setTo] = useState(value.to ?? "");
 	const [domain, setDomain] = useState(value.domain ?? "");
+	const [after, setAfter] = useState(value.after ?? "");
+	const [before, setBefore] = useState(value.before ?? "");
 
 	useEffect(() => {
 		setQ(value.q ?? "");
 		setFrom(value.from ?? "");
 		setTo(value.to ?? "");
 		setDomain(value.domain ?? "");
-	}, [value.q, value.from, value.to, value.domain]);
+		setAfter(value.after ?? "");
+		setBefore(value.before ?? "");
+	}, [value.q, value.from, value.to, value.domain, value.after, value.before]);
 
 	function apply() {
 		onChange({
@@ -29,6 +33,8 @@ export function FiltersBar({ value, onChange, onDeleteFiltered, deleting = false
 			from: from.trim() || undefined,
 			to: to.trim().toLowerCase() || undefined,
 			domain: domain.trim().toLowerCase().replace(/^@/, "") || undefined,
+			after: after || undefined,
+			before: before || undefined,
 			offset: 0,
 		});
 	}
@@ -38,10 +44,12 @@ export function FiltersBar({ value, onChange, onDeleteFiltered, deleting = false
 		setFrom("");
 		setTo("");
 		setDomain("");
+		setAfter("");
+		setBefore("");
 		onChange({ limit: value.limit, offset: 0 });
 	}
 
-	const hasFilters = Boolean(q || from || to || domain || value.after || value.before);
+	const hasFilters = Boolean(q || from || to || domain || after || before);
 
 	return (
 		<div className="flex flex-wrap items-center gap-2 border-b border-black/5 bg-white px-4 py-3">
@@ -74,6 +82,20 @@ export function FiltersBar({ value, onChange, onDeleteFiltered, deleting = false
 				onKeyDown={(e) => {
 					if (e.key === "Enter") apply();
 				}}
+			/>
+			<Input
+				className="w-[150px]"
+				type="date"
+				aria-label="After date"
+				value={after}
+				onChange={(e) => setAfter((e.target as HTMLInputElement).value)}
+			/>
+			<Input
+				className="w-[150px]"
+				type="date"
+				aria-label="Before date"
+				value={before}
+				onChange={(e) => setBefore((e.target as HTMLInputElement).value)}
 			/>
 			<Button variant="secondary" onPress={apply}>
 				Apply

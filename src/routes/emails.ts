@@ -15,8 +15,8 @@ import { ERR, OK } from "@/utils/http";
 
 const emails = new Hono<{ Bindings: CloudflareBindings }>();
 
-function parseFilters(query: Record<string, string>): EmailFilters {
-	const limit = Math.min(Math.max(Number(query.limit) || 20, 1), 100);
+function parseFilters(query: Record<string, string>, maxLimit = 100): EmailFilters {
+	const limit = Math.min(Math.max(Number(query.limit) || 20, 1), maxLimit);
 	const offset = Math.max(Number(query.offset) || 0, 0);
 
 	return {
@@ -283,7 +283,7 @@ emails.delete("/api/emails/:id", async (c) => {
 
 // Delete recent emails matching filters (and their attachments from R2)
 emails.delete("/api/emails", async (c) => {
-	const filters = parseFilters(c.req.query());
+	const filters = parseFilters(c.req.query(), 500);
 	if (!hasDeleteFilters(filters)) {
 		return c.json(ERR("FILTER_REQUIRED", "Refine filters before deleting emails"), 400);
 	}
